@@ -15,7 +15,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 package it.feargames.auracheck;
 
 import com.comphenix.packetwrapper.WrapperPlayClientUseEntity;
@@ -26,11 +25,11 @@ import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.events.PacketEvent;
 import com.comphenix.protocol.wrappers.EnumWrappers.EntityUseAction;
 import com.comphenix.protocol.wrappers.WrappedChatComponent;
-
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -38,170 +37,146 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.lang.reflect.InvocationTargetException;
-import java.text.NumberFormat;
-import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
+import java.util.Map;
 import java.util.UUID;
 
-
 public class AuraCheck extends JavaPlugin implements Listener {
-
-    private static final NumberFormat NUMBER_FORMAT;
-
-    static {
-        NUMBER_FORMAT = NumberFormat.getInstance();
-        NUMBER_FORMAT.setMaximumIntegerDigits(Integer.MAX_VALUE);
-        NUMBER_FORMAT.setMinimumIntegerDigits(1);
-        NUMBER_FORMAT.setMaximumFractionDigits(2);
-        NUMBER_FORMAT.setMinimumFractionDigits(1);
-    }
-
-    private HashMap<UUID, Checker> running = new HashMap<>();
+    private Map<UUID, Checker> runningChecks;
     private boolean isRegistered;
-    public static final Random RANDOM = new Random();
+    private FileConfiguration config;
 
     @Override
     public void onEnable() {
-        this.saveDefaultConfig();
-        this.getServer().getPluginManager().registerEvents(this, this);
+        runningChecks = new HashMap<>();
+        isRegistered = false;
+
+        // Load config
+        saveDefaultConfig();
+        config = getConfig();
+
+        // Register listeners
+        getServer().getPluginManager().registerEvents(this, this);
     }
 
-    public void register() {
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        removeCheck(event.getPlayer());
+    }
+
+    public void registerPacketListener() {
         ProtocolLibrary.getProtocolManager().addPacketListener(
                 new PacketAdapter(this, WrapperPlayClientUseEntity.TYPE) {
                     @Override
                     public void onPacketReceiving(PacketEvent event) {
-                        if (event.getPacketType() == WrapperPlayClientUseEntity.TYPE) {
-                            WrapperPlayClientUseEntity packet = new WrapperPlayClientUseEntity(event.getPacket());
-                            int entID = packet.getTarget();
-                            if (running.containsKey(event.getPlayer().getUniqueId()) && packet.getType() == EntityUseAction.ATTACK) {
-                                running.get(event.getPlayer().getUniqueId()).markAsKilled(entID);
-                            }
+                        WrapperPlayClientUseEntity packet = new WrapperPlayClientUseEntity(event.getPacket());
+                        if (packet.getType() != EntityUseAction.ATTACK) {
+                            return;
                         }
+                        Checker checker = runningChecks.get(event.getPlayer().getUniqueId());
+                        if (checker == null) {
+                            return;
+                        }
+                        checker.markAsKilled(packet.getTargetID());
                     }
 
                 });
-        this.isRegistered = true;
+        isRegistered = true;
     }
 
-    public void unregister() {
+    public void unregisterPacketListener() {
         ProtocolLibrary.getProtocolManager().removePacketListeners(this);
-        this.isRegistered = false;
+        isRegistered = false;
     }
 
-    public Checker remove(UUID id) {
-        if (this.running.containsKey(id)) {
-
-            if (running.size() == 1) {
-                this.unregister();
-            }
-
-            return this.running.remove(id);
+    public Checker removeCheck(Player player) {
+        Checker checker = runningChecks.remove(player.getUniqueId());
+        if (checker != null && runningChecks.isEmpty()) {
+            this.unregisterPacketListener();
         }
-        return null;
+        return checker;
+    }
+
+    public Checker addCheck(Player player) {
+        if (!isRegistered) {
+            registerPacketListener();
+        }
+        return runningChecks.put(player.getUniqueId(), new Checker(this, player));
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length < 1) {
+    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+        if (args.length != 1) {
             return false;
         }
         if (args[0].equalsIgnoreCase("reload")) {
-            this.reloadConfig();
-            sender.sendMessage(ChatColor.GREEN + "AntiAura config successfully reloaded");
+            reloadConfig();
+            sender.sendMessage(ChatColor.GREEN + "Configuration successfully reloaded!");
             return true;
         }
-
-        if(args[0].equals("*")) {
-            if (!isRegistered) {
-                this.register();
-            }
-
-            for(Player player : Bukkit.getOnlinePlayers()) {
-                Checker check = new Checker(this, player);
-                running.put(player.getUniqueId(), check);
-
-                check.invoke(sender, new Checker.Callback() {
-                    @Override
-                    public void done(long started, long finished, AbstractMap.SimpleEntry<Integer, Integer> result, CommandSender invoker, Player target) {
-                        if (invoker instanceof Player && !((Player) invoker).isOnline()) {
-                            return;
-                        }
-                        if (result.getKey() >= getConfig().getInt("commandTrigger")) {
-                            String command = getConfig().getString("command").replaceAll("%p", target.getName());
-                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
-                            invoker.sendMessage(ChatColor.RED + target.getName() + " have been kicked from the server! " + "Killed " + result.getKey() + " out of " + result.getValue());
-                        } else if (result.getKey() >= 1) {
-                            invoker.sendMessage(ChatColor.DARK_PURPLE + target.getName() + " has killed " + result.getKey() + " out of " + result.getValue());
-                        }
+        if (args[0].equals("*")) {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                addCheck(player).invoke(sender, (amount, killed, invoker, target) -> {
+                    // If the invoker is not online just stop
+                    if (invoker instanceof Player && !((Player) invoker).isOnline()) {
+                        return;
                     }
+
+                    // Ignore player with 0 killed entities
+                    if (killed == 0) {
+                        return;
+                    }
+
+                    if (killed < config.getInt("commandTrigger")) {
+                        invoker.sendMessage(ChatColor.DARK_PURPLE + target.getName() + " has killed " + killed + " out of " + amount);
+                        return;
+                    }
+
+                    String command = config.getString("command").replaceAll("%p", target.getName());
+                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+                    invoker.sendMessage(ChatColor.RED + target.getName() + " have been kicked!" + ChatColor.DARK_PURPLE + " Killed " + killed + " out of " + amount);
                 });
             }
             return true;
         }
 
-        @SuppressWarnings("deprecation")
-        List<Player> playerList = Bukkit.matchPlayer(args[0]);
-        Player player;
-        if (playerList.isEmpty()) {
+        List<Player> candidates = Bukkit.matchPlayer(args[0]);
+        if (candidates.isEmpty()) {
             sender.sendMessage(ChatColor.RED + "Player is not online.");
             return true;
-        } else if (playerList.size() == 1) {
-            player = playerList.get(0);
-        } else {
+        } else if (candidates.size() > 1) {
             StringBuilder stringBuilder = new StringBuilder();
-            stringBuilder.append("[\"\",{\"text\":\"What player do you mean? (click one)\\n\",\"color\":\"green\"},");
-            for (Player p : playerList) {
+            stringBuilder.append("[\"\",{\"text\":\"Which player do you mean? (click one)\\n\",\"color\":\"green\"},");
+            for (Player p : candidates) {
                 stringBuilder.append("{\"text\":\"").append(p.getName()).append(", \",\"color\":\"blue\",\"clickEvent\":{\"action\":\"run_command\",\"value\":\"/auracheck ").append(p.getName()).append("\"},\"hoverEvent\":{\"action\":\"show_text\",\"value\":{\"text\":\"\",\"extra\":[{\"text\":\"").append(p.getName()).append("\",\"color\":\"dark_purple\"}]}}},");
             }
-            stringBuilder.deleteCharAt(stringBuilder.length() - 1);
-            stringBuilder.append("]");
-            String json = stringBuilder.toString();
+            stringBuilder.setCharAt(stringBuilder.length(), ']');
             PacketContainer packet = new PacketContainer(PacketType.Play.Server.CHAT);
-            packet.getChatComponents().write(0, WrappedChatComponent.fromJson(json));
+            packet.getChatComponents().write(0, WrappedChatComponent.fromJson(stringBuilder.toString()));
             try {
                 ProtocolLibrary.getProtocolManager().sendServerPacket((Player) sender, packet);
-            } catch (InvocationTargetException e) {
+            } catch (InvocationTargetException ignore) {
             }
             return true;
         }
-        if (player == null) {
-            sender.sendMessage(ChatColor.RED + "Player is not online.");
-            return true;
-        }
 
-        if (!isRegistered) {
-            this.register();
-        }
-
-        Checker check = new Checker(this, player);
-        running.put(player.getUniqueId(), check);
-
-        check.invoke(sender, new Checker.Callback() {
-            @Override
-            public void done(long started, long finished, AbstractMap.SimpleEntry<Integer, Integer> result, CommandSender invoker, Player target) {
-                if (invoker instanceof Player && !((Player) invoker).isOnline()) {
-                    return;
-                }
-                invoker.sendMessage(ChatColor.DARK_PURPLE + "Aura check result for " + target.getName() + ": killed " + result.getKey() + " out of " + result.getValue());
-                if (result.getKey() >= getConfig().getInt("commandTrigger")) {
-                    String command = getConfig().getString("command").replaceAll("%p", target.getName());
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
-                }
-                double timeTaken = finished != Long.MAX_VALUE ? ((double) (finished - started)) / 1000D : ((double) getConfig().getInt("ticksToKill", 10)) / 20D;
-                invoker.sendMessage(ChatColor.DARK_PURPLE + "Check length: " + NUMBER_FORMAT.format(timeTaken) + " seconds.");
+        Player player = Bukkit.getPlayerExact(args[0]);
+        addCheck(player).invoke(sender, (amount, killed, invoker, target) -> {
+            // If the invoker is not online just stop
+            if (invoker instanceof Player && !((Player) invoker).isOnline()) {
+                return;
             }
+
+            if (killed < config.getInt("commandTrigger")) {
+                invoker.sendMessage(ChatColor.DARK_PURPLE + target.getName() + " has killed " + killed + " out of " + amount);
+                return;
+            }
+
+            String command = config.getString("command").replaceAll("%p", target.getName());
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+            invoker.sendMessage(ChatColor.RED + target.getName() + " have been kicked!" + ChatColor.DARK_PURPLE + " Killed " + killed + " out of " + amount);
         });
         return true;
-    }
-
-    @EventHandler
-    public void onDisconnect(PlayerQuitEvent event) {
-        Checker check = this.remove(event.getPlayer().getUniqueId());
-        if (check != null) {
-            check.end();
-        }
     }
 }

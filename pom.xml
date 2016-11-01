@@ -6,10 +6,10 @@
 
     <groupId>it.feargames</groupId>
     <artifactId>auracheck</artifactId>
-    <version>0.6-SNAPSHOT</version>
+    <version>0.7-SNAPSHOT</version>
 
     <name>AuraCheck</name>
-    <description>Simple killaura hack checker.</description>
+    <description>Simple killaura checker</description>
 
     <issueManagement>
         <system>GitHub</system>
@@ -18,7 +18,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.jdkVersion>1.7</project.jdkVersion>
+        <project.jdkVersion>1.8</project.jdkVersion>
         <project.main>${project.groupId}.${project.artifactId}.${project.name}</project.main>
         <project.authors>maciekmm, RoboMWM, sgdc3</project.authors>
     </properties>
@@ -38,7 +38,7 @@
         <dependency>
             <groupId>org.bukkit</groupId>
             <artifactId>bukkit</artifactId>
-            <version>1.8.8-R0.1-SNAPSHOT</version>
+            <version>1.10.2-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
             <exclusions>
             	<exclusion>
@@ -65,8 +65,8 @@
         </dependency>
         <dependency>
             <groupId>com.comphenix.protocol</groupId>
-            <artifactId>ProtocolLib</artifactId>
-            <version>3.6.6-SNAPSHOT</version>
+            <artifactId>ProtocolLib-API</artifactId>
+            <version>4.1.0</version>
             <scope>provided</scope>
             <exclusions>
             	<exclusion>
@@ -79,11 +79,10 @@
             	</exclusion>
             </exclusions>
         </dependency>
-        <!-- RELOCATE ME! -->
         <dependency>
             <groupId>com.comphenix.packetwrapper</groupId>
             <artifactId>PacketWrapper</artifactId>
-            <version>1.8.7-R0.1-SNAPSHOT</version>
+            <version>1.10-R0.1-SNAPSHOT</version>
             <scope>compile</scope>
             <exclusions>
             	<exclusion>
