@@ -102,7 +102,11 @@ public class AuraCheck extends JavaPlugin implements Listener {
         if (!isRegistered) {
             registerPacketListener();
         }
-        return runningChecks.put(player.getUniqueId(), new Checker(this, player));
+
+        Checker checker = new Checker(this, player);
+        runningChecks.put(player.getUniqueId(), checker);
+
+        return checker;
     }
 
     @Override
@@ -117,7 +121,8 @@ public class AuraCheck extends JavaPlugin implements Listener {
         }
         if (args[0].equals("*")) {
             for (Player player : Bukkit.getOnlinePlayers()) {
-                addCheck(player).invoke(sender, (amount, killed, invoker, target) -> {
+                Checker checker = addCheck(player);
+                Checker.Callback callback = (amount, killed, invoker, target) -> {
                     // If the invoker is not online just stop
                     if (invoker instanceof Player && !((Player) invoker).isOnline()) {
                         return;
@@ -136,33 +141,21 @@ public class AuraCheck extends JavaPlugin implements Listener {
                     String command = config.getString("command").replaceAll("%p", target.getName());
                     Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
                     invoker.sendMessage(ChatColor.RED + target.getName() + " have been kicked!" + ChatColor.DARK_PURPLE + " Killed " + killed + " out of " + amount);
-                });
-            }
-            return true;
-        }
+                };
 
-        List<Player> candidates = Bukkit.matchPlayer(args[0]);
-        if (candidates.isEmpty()) {
-            sender.sendMessage(ChatColor.RED + "Player is not online.");
-            return true;
-        } else if (candidates.size() > 1) {
-            StringBuilder stringBuilder = new StringBuilder();
-            stringBuilder.append("[\"\",{\"text\":\"Which player do you mean? (click one)\\n\",\"color\":\"green\"},");
-            for (Player p : candidates) {
-                stringBuilder.append("{\"text\":\"").append(p.getName()).append(", \",\"color\":\"blue\",\"clickEvent\":{\"action\":\"run_command\",\"value\":\"/auracheck ").append(p.getName()).append("\"},\"hoverEvent\":{\"action\":\"show_text\",\"value\":{\"text\":\"\",\"extra\":[{\"text\":\"").append(p.getName()).append("\",\"color\":\"dark_purple\"}]}}},");
-            }
-            stringBuilder.setCharAt(stringBuilder.length(), ']');
-            PacketContainer packet = new PacketContainer(PacketType.Play.Server.CHAT);
-            packet.getChatComponents().write(0, WrappedChatComponent.fromJson(stringBuilder.toString()));
-            try {
-                ProtocolLibrary.getProtocolManager().sendServerPacket((Player) sender, packet);
-            } catch (InvocationTargetException ignore) {
+                checker.invoke(sender, callback);
             }
             return true;
         }
 
         Player player = Bukkit.getPlayerExact(args[0]);
-        addCheck(player).invoke(sender, (amount, killed, invoker, target) -> {
+        if(player == null) {
+            sender.sendMessage(ChatColor.RED + "Player is not online.");
+            return true;
+        }
+
+        Checker checker = addCheck(player);
+        Checker.Callback callback = (amount, killed, invoker, target) -> {
             // If the invoker is not online just stop
             if (invoker instanceof Player && !((Player) invoker).isOnline()) {
                 return;
@@ -176,7 +169,9 @@ public class AuraCheck extends JavaPlugin implements Listener {
             String command = config.getString("command").replaceAll("%p", target.getName());
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
             invoker.sendMessage(ChatColor.RED + target.getName() + " have been kicked!" + ChatColor.DARK_PURPLE + " Killed " + killed + " out of " + amount);
-        });
+        };
+        checker.invoke(sender,callback);
+
         return true;
     }
 }

@@ -35,6 +35,13 @@ import java.util.*;
 
 
 public class Checker {
+    // Packet data serializer
+    private final static WrappedDataWatcher.Serializer SERIALIZER = WrappedDataWatcher.Registry.get(Byte.class);
+    private final static WrappedDataWatcher.Serializer FLOAT_SERIALIZER = WrappedDataWatcher.Registry.get(Float.class);
+    private final static WrappedDataWatcher.WrappedDataWatcherObject OBJECT = new WrappedDataWatcher.WrappedDataWatcherObject(0, SERIALIZER);
+    private final static WrappedDataWatcher.WrappedDataWatcherObject OBJECT_2 = new WrappedDataWatcher.WrappedDataWatcherObject(11, SERIALIZER);
+    private final static WrappedDataWatcher.WrappedDataWatcherObject FLOAT_OBJECT = new WrappedDataWatcher.WrappedDataWatcherObject(6, FLOAT_SERIALIZER);
+
     private final AuraCheck plugin;
     private Set<Integer> spawnedEntities;
     private CommandSender invoker;
@@ -108,11 +115,13 @@ public class Checker {
         wrapper.setPlayerUUID(UUID.randomUUID());
         wrapper.setYaw(0.0F);
         wrapper.setPitch(-45.0F);
+
         WrappedDataWatcher watcher = new WrappedDataWatcher();
-        watcher.setObject(0, plugin.getConfig().getBoolean("invisibility", false) ? (byte) 0x20 : (byte) 0);
-        watcher.setObject(6, 0.5F);
-        watcher.setObject(11, (byte) 1);
+        watcher.setObject(OBJECT, plugin.getConfig().getBoolean("invisibility", false) ? (byte) 0x20 : (byte) 0);
+        watcher.setObject(FLOAT_OBJECT, 0.5F);
+        watcher.setObject(OBJECT_2, (byte) 1);
         wrapper.setMetadata(watcher);
+
         return wrapper;
     }
 
