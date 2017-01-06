@@ -6,7 +6,7 @@
 
     <groupId>it.feargames</groupId>
     <artifactId>auracheck</artifactId>
-    <version>0.7-SNAPSHOT</version>
+    <version>0.8-SNAPSHOT</version>
 
     <name>AuraCheck</name>
     <description>Simple killaura checker</description>
@@ -35,10 +35,27 @@
     </repositories>
 
     <dependencies>
+        <!-- Dependency Injection -->
+        <dependency>
+            <groupId>ch.jalu</groupId>
+            <artifactId>injector</artifactId>
+            <version>0.3</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- Configuration library -->
+        <dependency>
+            <groupId>ch.jalu</groupId>
+            <artifactId>configme</artifactId>
+            <version>0.3</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- Bukkit API -->
         <dependency>
             <groupId>org.bukkit</groupId>
             <artifactId>bukkit</artifactId>
-            <version>1.10.2-R0.1-SNAPSHOT</version>
+            <version>1.11.2-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
             <exclusions>
             	<exclusion>
@@ -63,10 +80,12 @@
             	</exclusion>
             </exclusions>
         </dependency>
+
+        <!-- ProtocolLib API -->
         <dependency>
             <groupId>com.comphenix.protocol</groupId>
             <artifactId>ProtocolLib-API</artifactId>
-            <version>4.1.0</version>
+            <version>4.2.0</version>
             <scope>provided</scope>
             <exclusions>
             	<exclusion>
@@ -79,10 +98,12 @@
             	</exclusion>
             </exclusions>
         </dependency>
+
+        <!-- PacketWrapper utilities -->
         <dependency>
             <groupId>com.comphenix.packetwrapper</groupId>
             <artifactId>PacketWrapper</artifactId>
-            <version>1.10-R0.1-SNAPSHOT</version>
+            <version>1.11-R0.1-SNAPSHOT</version>
             <scope>compile</scope>
             <exclusions>
             	<exclusion>
@@ -106,7 +127,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.5.1</version>
+                <version>3.6.0</version>
                 <configuration>
                     <source>${project.jdkVersion}</source>
                     <target>${project.jdkVersion}</target>
@@ -126,6 +147,18 @@
 	            </executions>
 	            <configuration>
 	                <relocations>
+                        <relocation>
+                            <pattern>javax.inject</pattern>
+                            <shadedPattern>it.feargames.auracheck.libs.inject</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>ch.jalu.injector</pattern>
+                            <shadedPattern>it.feargames.auracheck.libs.injector</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>ch.jalu.configme</pattern>
+                            <shadedPattern>it.feargames.auracheck.libs.configme</shadedPattern>
+                        </relocation>
 	                    <relocation>
 	                        <pattern>com.comphenix.packetwrapper</pattern>
 	                        <shadedPattern>it.feargames.auracheck.libs.packetwrapper</shadedPattern>

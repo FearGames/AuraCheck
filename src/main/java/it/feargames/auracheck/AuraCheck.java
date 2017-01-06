@@ -1,177 +1,171 @@
-/*
- * Copyright (C) 2014 Maciej Mionskowski
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 package it.feargames.auracheck;
 
-import com.comphenix.packetwrapper.WrapperPlayClientUseEntity;
-import com.comphenix.protocol.PacketType;
-import com.comphenix.protocol.ProtocolLibrary;
-import com.comphenix.protocol.events.PacketAdapter;
-import com.comphenix.protocol.events.PacketContainer;
-import com.comphenix.protocol.events.PacketEvent;
-import com.comphenix.protocol.wrappers.EnumWrappers.EntityUseAction;
-import com.comphenix.protocol.wrappers.WrappedChatComponent;
+import ch.jalu.configme.SettingsManager;
+import ch.jalu.injector.Injector;
+import ch.jalu.injector.InjectorBuilder;
+import it.feargames.auracheck.annotations.DataFolder;
+import it.feargames.auracheck.config.ConfigProperties;
+import it.feargames.auracheck.config.SettingsProvider;
+import it.feargames.auracheck.listeners.PlayerListener;
+import it.feargames.auracheck.data.Checker;
+import it.feargames.auracheck.data.CheckerManager;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Server;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitScheduler;
 
-import java.lang.reflect.InvocationTargetException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+public class AuraCheck extends JavaPlugin {
 
-public class AuraCheck extends JavaPlugin implements Listener {
-    private Map<UUID, Checker> runningChecks;
-    private boolean isRegistered;
-    private FileConfiguration config;
+    private Injector injector;
+    private SettingsManager settings;
+    private CheckerManager checkerManager;
+
+    public AuraCheck() {
+    }
 
     @Override
     public void onEnable() {
-        runningChecks = new HashMap<>();
-        isRegistered = false;
+        // Prepare the injector
+        setupInjector();
 
-        // Load config
-        saveDefaultConfig();
-        config = getConfig();
+        // Get the singletons from the injector
+        settings = injector.getSingleton(SettingsManager.class);
+        checkerManager = injector.getSingleton(CheckerManager.class);
 
         // Register listeners
-        getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(injector.getSingleton(PlayerListener.class), this);
     }
 
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        removeCheck(event.getPlayer());
+    private void setupInjector() {
+        injector = new InjectorBuilder().addDefaultHandlers("it.feargames.auracheck").create();
+        injector.register(AuraCheck.class, this);
+        injector.register(Server.class, getServer());
+        injector.register(PluginManager.class, getServer().getPluginManager());
+        injector.register(BukkitScheduler.class, getServer().getScheduler());
+        injector.provide(DataFolder.class, getDataFolder());
+        injector.registerProvider(SettingsManager.class, SettingsProvider.class);
     }
 
-    public void registerPacketListener() {
-        ProtocolLibrary.getProtocolManager().addPacketListener(
-                new PacketAdapter(this, WrapperPlayClientUseEntity.TYPE) {
-                    @Override
-                    public void onPacketReceiving(PacketEvent event) {
-                        WrapperPlayClientUseEntity packet = new WrapperPlayClientUseEntity(event.getPacket());
-                        if (packet.getType() != EntityUseAction.ATTACK) {
-                            return;
-                        }
-                        Checker checker = runningChecks.get(event.getPlayer().getUniqueId());
-                        if (checker == null) {
-                            return;
-                        }
-                        checker.markAsKilled(packet.getTargetID());
-                    }
-
-                });
-        isRegistered = true;
-    }
-
-    public void unregisterPacketListener() {
-        ProtocolLibrary.getProtocolManager().removePacketListeners(this);
-        isRegistered = false;
-    }
-
-    public Checker removeCheck(Player player) {
-        Checker checker = runningChecks.remove(player.getUniqueId());
-        if (checker != null && runningChecks.isEmpty()) {
-            this.unregisterPacketListener();
-        }
-        return checker;
-    }
-
-    public Checker addCheck(Player player) {
-        if (!isRegistered) {
-            registerPacketListener();
-        }
-
-        Checker checker = new Checker(this, player);
-        runningChecks.put(player.getUniqueId(), checker);
-
-        return checker;
-    }
-
+    /**
+     * The plugin's command handler
+     */
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        if (args.length != 1) {
-            return false;
-        }
-        if (args[0].equalsIgnoreCase("reload")) {
-            reloadConfig();
-            sender.sendMessage(ChatColor.GREEN + "Configuration successfully reloaded!");
+        // -> /ac OR /ac help
+        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
+            sender.sendMessage("-----[ AuraCheck Help ]-----");
+            sender.sendMessage(" /ac help");
+            sender.sendMessage(" /ac reload");
+            sender.sendMessage(" /ac check <playername>");
+            sender.sendMessage(" /ac check *");
+            sender.sendMessage(" /ac checkmob <playername>");
+            sender.sendMessage(" /ac checkmob *");
+            sender.sendMessage("----------------------------");
             return true;
         }
-        if (args[0].equals("*")) {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                Checker checker = addCheck(player);
-                Checker.Callback callback = (amount, killed, invoker, target) -> {
-                    // If the invoker is not online just stop
-                    if (invoker instanceof Player && !((Player) invoker).isOnline()) {
-                        return;
-                    }
+        String subCmd = args[0];
 
-                    // Ignore player with 0 killed entities
-                    if (killed == 0) {
-                        return;
-                    }
+        // -> /ac reload
+        if (subCmd.equalsIgnoreCase("reload")) {
+            settings.reload();
+            sender.sendMessage(ChatColor.GREEN + "Configuration reloaded successfully!");
+            return true;
+        }
 
-                    if (killed < config.getInt("commandTrigger")) {
-                        invoker.sendMessage(ChatColor.DARK_PURPLE + target.getName() + " has killed " + killed + " out of " + amount);
-                        return;
-                    }
+        // -> /ac check ...
+        if (subCmd.equalsIgnoreCase("check")) {
+            // -> /ac check
+            if (args.length < 2) {
+                // Send help
+                return true;
+            }
+            String param = args[1];
 
-                    String command = config.getString("command").replaceAll("%p", target.getName());
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
-                    invoker.sendMessage(ChatColor.RED + target.getName() + " have been kicked!" + ChatColor.DARK_PURPLE + " Killed " + killed + " out of " + amount);
-                };
+            // -> /ac check *
+            if (param.equals("*")) {
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    checkPlayer(sender, player, true, false);
+                }
+            }
 
-                checker.invoke(sender, callback);
+            // -> /ac check playername
+            else {
+                Player player = Bukkit.getPlayerExact(param);
+                if (player == null) {
+                    sender.sendMessage(ChatColor.RED + "Player is not online.");
+                } else {
+                    checkPlayer(sender, player, false, false);
+                }
             }
             return true;
         }
 
-        Player player = Bukkit.getPlayerExact(args[0]);
-        if(player == null) {
-            sender.sendMessage(ChatColor.RED + "Player is not online.");
+        // -> /ac checkmob ...
+        if (subCmd.equalsIgnoreCase("checkmob")) {
+
+            // -> /ac checkmob
+            if (args.length < 2) {
+                // Send help
+                return true;
+            }
+            String param = args[1];
+
+            // -> /ac checkmob *
+            if (param.equals("*")) {
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    checkPlayer(sender, player, true, true);
+                }
+            }
+
+            // -> /ac checkmob playername
+            else {
+                Player player = Bukkit.getPlayerExact(param);
+                if (player == null) {
+                    sender.sendMessage(ChatColor.RED + "Player is not online.");
+                } else {
+                    checkPlayer(sender, player, false, true);
+                }
+            }
             return true;
         }
+        return false;
+    }
 
-        Checker checker = addCheck(player);
+    /**
+     * Check a player
+     *
+     * @param sender      The output message receiver
+     * @param player      The player
+     * @param ignoreLegit Should we ignore the output if the player kills 0 NPCs?
+     * @param useMobs     Should we use mobs instead of fake players?
+     */
+    public void checkPlayer(CommandSender sender, Player player, boolean ignoreLegit, boolean useMobs) {
+        Checker checker = checkerManager.addCheck(player, useMobs);
         Checker.Callback callback = (amount, killed, invoker, target) -> {
             // If the invoker is not online just stop
             if (invoker instanceof Player && !((Player) invoker).isOnline()) {
                 return;
             }
 
-            if (killed < config.getInt("commandTrigger")) {
+            // Ignore player with 0 killed entities
+            if (ignoreLegit && killed == 0) {
+                return;
+            }
+
+            if (killed < settings.getProperty(ConfigProperties.COMMAND_TRIGGER)) {
                 invoker.sendMessage(ChatColor.DARK_PURPLE + target.getName() + " has killed " + killed + " out of " + amount);
                 return;
             }
 
-            String command = config.getString("command").replaceAll("%p", target.getName());
+            String command = settings.getProperty(ConfigProperties.COMMAND).replaceAll("%p", target.getName());
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
             invoker.sendMessage(ChatColor.RED + target.getName() + " have been kicked!" + ChatColor.DARK_PURPLE + " Killed " + killed + " out of " + amount);
         };
-        checker.invoke(sender,callback);
-
-        return true;
+        checker.invoke(this, checkerManager, sender, callback);
     }
 }

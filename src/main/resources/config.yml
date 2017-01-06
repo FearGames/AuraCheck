@@ -1,5 +1,0 @@
-ticksToKill: 10
-amountOfFakePlayers: 4
-invisibility: false
-commandTrigger: 2
-command: "kick %p Don't use hacks!"
