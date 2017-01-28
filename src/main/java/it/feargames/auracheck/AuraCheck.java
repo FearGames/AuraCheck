@@ -9,6 +9,7 @@ import it.feargames.auracheck.config.SettingsProvider;
 import it.feargames.auracheck.listeners.PlayerListener;
 import it.feargames.auracheck.data.Checker;
 import it.feargames.auracheck.data.CheckerManager;
+import it.feargames.auracheck.tasks.AutoTask;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Server;
@@ -17,15 +18,19 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitScheduler;
+import org.bukkit.scheduler.BukkitTask;
 
 public class AuraCheck extends JavaPlugin {
 
     private Injector injector;
     private SettingsManager settings;
     private CheckerManager checkerManager;
+    private BukkitTask autoTask;
 
     public AuraCheck() {
+        autoTask = null;
     }
 
     @Override
@@ -39,6 +44,9 @@ public class AuraCheck extends JavaPlugin {
 
         // Register listeners
         getServer().getPluginManager().registerEvents(injector.getSingleton(PlayerListener.class), this);
+
+        // Setup the auto check task
+        setupAutoTask();
     }
 
     private void setupInjector() {
@@ -51,6 +59,17 @@ public class AuraCheck extends JavaPlugin {
         injector.registerProvider(SettingsManager.class, SettingsProvider.class);
     }
 
+    private void setupAutoTask() {
+        if(autoTask != null) {
+            autoTask.cancel();
+        }
+        if(settings.getProperty(ConfigProperties.AUTO)) {
+            autoTask = new AutoTask(this).runTaskTimer(this, 20 * 10, 20 * 60 * 5);
+        } else {
+            autoTask = null;
+        }
+    }
+
     /**
      * The plugin's command handler
      */
@@ -58,14 +77,7 @@ public class AuraCheck extends JavaPlugin {
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         // -> /ac OR /ac help
         if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
-            sender.sendMessage("-----[ AuraCheck Help ]-----");
-            sender.sendMessage(" /ac help");
-            sender.sendMessage(" /ac reload");
-            sender.sendMessage(" /ac check <playername>");
-            sender.sendMessage(" /ac check *");
-            sender.sendMessage(" /ac checkmob <playername>");
-            sender.sendMessage(" /ac checkmob *");
-            sender.sendMessage("----------------------------");
+            sendHelp(sender);
             return true;
         }
         String subCmd = args[0];
@@ -74,6 +86,34 @@ public class AuraCheck extends JavaPlugin {
         if (subCmd.equalsIgnoreCase("reload")) {
             settings.reload();
             sender.sendMessage(ChatColor.GREEN + "Configuration reloaded successfully!");
+            setupInjector();
+            return true;
+        }
+
+        // -> /ac auto ...
+        if (subCmd.equalsIgnoreCase("auto")) {
+            // -> /ac auto
+            if (args.length < 2) {
+                sendHelp(sender);
+                return true;
+            }
+            String param = args[1];
+            // -> /ac auto on
+            switch (param.toLowerCase()) {
+                case "on":
+                    sender.sendMessage(ChatColor.GREEN + "Auto mode enabled!");
+                    settings.setProperty(ConfigProperties.AUTO, true);
+                    settings.save();
+                    break;
+                case "off":
+                    sender.sendMessage(ChatColor.RED + "Auto mode disabled!");
+                    settings.setProperty(ConfigProperties.AUTO, false);
+                    settings.save();
+                    break;
+                default:
+                    sendHelp(sender);
+            }
+            setupAutoTask();
             return true;
         }
 
@@ -81,7 +121,7 @@ public class AuraCheck extends JavaPlugin {
         if (subCmd.equalsIgnoreCase("check")) {
             // -> /ac check
             if (args.length < 2) {
-                // Send help
+                sendHelp(sender);
                 return true;
             }
             String param = args[1];
@@ -110,7 +150,7 @@ public class AuraCheck extends JavaPlugin {
 
             // -> /ac checkmob
             if (args.length < 2) {
-                // Send help
+                sendHelp(sender);
                 return true;
             }
             String param = args[1];
@@ -134,6 +174,18 @@ public class AuraCheck extends JavaPlugin {
             return true;
         }
         return false;
+    }
+
+    private void sendHelp(CommandSender sender) {
+        sender.sendMessage("-----[ AuraCheck Help ]-----");
+        sender.sendMessage(" /ac help");
+        sender.sendMessage(" /ac reload");
+        sender.sendMessage(" /ac check <playername>");
+        sender.sendMessage(" /ac check *");
+        sender.sendMessage(" /ac checkmob <playername>");
+        sender.sendMessage(" /ac checkmob *");
+        sender.sendMessage(" /ac auto [on/off]");
+        sender.sendMessage("----------------------------");
     }
 
     /**

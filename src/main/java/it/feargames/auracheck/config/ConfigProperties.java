@@ -26,6 +26,12 @@ public class ConfigProperties implements SettingsHolder {
     @Comment("The command, available variables: %p = playername")
     public final static Property<String> COMMAND = newProperty("command", "kick %p Don't use cheats!");
 
+    @Comment("Auto mode, sends a check every X minutes")
+    public final static Property<Boolean> AUTO = newProperty("auto", false);
+
+    @Comment("Auto mode interval in minutes")
+    public final static Property<Integer> AUTO_INTERVAL = newProperty("interval", 8);
+
     private ConfigProperties(){
     }
 }
