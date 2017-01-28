@@ -173,7 +173,8 @@ public class AuraCheck extends JavaPlugin {
             }
             return true;
         }
-        return false;
+        sendHelp(sender);
+        return true;
     }
 
     private void sendHelp(CommandSender sender) {

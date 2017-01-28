@@ -6,7 +6,7 @@ main: ${project.main}
 depend: [ProtocolLib]
 commands:
   auracheck:
-    description: Check if player has killaura hack
-    usage: /<command> <username> - checks for killaura hack
+    description: Main AuraCheck command
+    usage: /<command> <subcommand>
     aliases: [ac]
     permission: auracheck.check
