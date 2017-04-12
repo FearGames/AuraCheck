@@ -35,6 +35,11 @@ public class AuraCheck extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        // Create data folder, show greeting message
+        if(getDataFolder().mkdir()) {
+            getLogger().info("Thank you for using AuraCheck! Please check the config file to customize the plugin's behaviour!");
+        }
+
         // Prepare the injector
         setupInjector();
 
