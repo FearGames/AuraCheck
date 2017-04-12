@@ -39,7 +39,7 @@
         <dependency>
             <groupId>ch.jalu</groupId>
             <artifactId>injector</artifactId>
-            <version>0.3</version>
+            <version>0.4</version>
             <scope>compile</scope>
         </dependency>
 
@@ -47,7 +47,7 @@
         <dependency>
             <groupId>ch.jalu</groupId>
             <artifactId>configme</artifactId>
-            <version>0.3</version>
+            <version>0.4</version>
             <scope>compile</scope>
         </dependency>
 
@@ -127,7 +127,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>3.6.1</version>
                 <configuration>
                     <source>${project.jdkVersion}</source>
                     <target>${project.jdkVersion}</target>
