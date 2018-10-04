@@ -1,9 +1,8 @@
 package it.feargames.auracheck.config;
 
 import ch.jalu.configme.SettingsManager;
+import ch.jalu.configme.SettingsManagerBuilder;
 import ch.jalu.configme.migration.PlainMigrationService;
-import ch.jalu.configme.resource.PropertyResource;
-import ch.jalu.configme.resource.YamlFileResource;
 import it.feargames.auracheck.annotations.DataFolder;
 import it.feargames.auracheck.utils.FileUtils;
 
@@ -34,7 +33,8 @@ public class SettingsProvider implements Provider<SettingsManager> {
         if (!configFile.exists()) {
             FileUtils.create(configFile);
         }
-        PropertyResource resource = new YamlFileResource(configFile);
-        return new SettingsManager(resource, new PlainMigrationService(), ConfigProperties.class);
+        return SettingsManagerBuilder.withYamlFile(configFile)
+                .migrationService(new PlainMigrationService())
+                .configurationData(ConfigProperties.class).create();
     }
 }
