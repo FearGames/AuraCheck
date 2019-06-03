@@ -4,6 +4,7 @@ description: ${project.description}
 author: ${project.authors}
 main: ${project.main}
 depend: [ProtocolLib]
+api-version: '1.14'
 commands:
   auracheck:
     description: Main AuraCheck command
