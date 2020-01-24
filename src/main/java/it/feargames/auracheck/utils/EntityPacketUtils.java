@@ -5,7 +5,6 @@ import com.comphenix.packetwrapper.WrapperPlayServerNamedEntitySpawn;
 import com.comphenix.packetwrapper.WrapperPlayServerPlayerInfo;
 import com.comphenix.packetwrapper.WrapperPlayServerSpawnEntityLiving;
 import com.comphenix.protocol.wrappers.*;
-import net.minecraft.server.v1_15_R1.PacketPlayOutNamedEntitySpawn;
 import org.bukkit.entity.EntityType;
 import org.bukkit.util.Vector;
 
