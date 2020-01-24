@@ -5,6 +5,7 @@ import com.comphenix.packetwrapper.WrapperPlayServerNamedEntitySpawn;
 import com.comphenix.packetwrapper.WrapperPlayServerPlayerInfo;
 import com.comphenix.packetwrapper.WrapperPlayServerSpawnEntityLiving;
 import com.comphenix.protocol.wrappers.*;
+import net.minecraft.server.v1_15_R1.PacketPlayOutNamedEntitySpawn;
 import org.bukkit.entity.EntityType;
 import org.bukkit.util.Vector;
 
@@ -49,9 +50,11 @@ public class EntityPacketUtils {
         wrapper.setYaw(0.0F);
         wrapper.setPitch(-45.0F);
 
+        /*
         WrappedDataWatcher watcher = new WrappedDataWatcher();
         watcher.setObject(OBJECT, invisible ? (byte) 0x20 : (byte) 0);
         wrapper.setMetadata(watcher);
+         */
 
         return wrapper;
     }
@@ -76,9 +79,11 @@ public class EntityPacketUtils {
         wrapper.setYaw(0.0F);
         wrapper.setPitch(-45.0F);
 
+        /*
         WrappedDataWatcher watcher = new WrappedDataWatcher();
         watcher.setObject(OBJECT, invisible ? (byte) 0x20 : (byte) 0);
         wrapper.setMetadata(watcher);
+         */
 
         return wrapper;
     }
